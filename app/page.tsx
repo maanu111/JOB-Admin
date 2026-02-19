@@ -1,242 +1,317 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "../supabaseClient";
 
-// Mock data for demonstration
-const mockJobseekers = [
-  { id: 1, name: "John Doe", email: "john@example.com", appliedJobs: 5, status: "Active" },
-  { id: 2, name: "Jane Smith", email: "jane@example.com", appliedJobs: 3, status: "Active" },
-  { id: 3, name: "Mike Johnson", email: "mike@example.com", appliedJobs: 2, status: "Inactive" },
-  { id: 4, name: "Sarah Williams", email: "sarah@example.com", appliedJobs: 7, status: "Active" },
-  { id: 5, name: "Tom Brown", email: "tom@example.com", appliedJobs: 1, status: "Active" },
-];
+type ToastType = "success" | "error" | "loading";
+interface ToastItem { id: number; type: ToastType; message: string; }
+let _tid = 0;
 
-const mockUsers = [
-  { id: 1, name: "Admin User", email: "admin@example.com", role: "Admin", status: "Active" },
-  { id: 2, name: "Sarah Wilson", email: "sarah@example.com", role: "Employer", status: "Active" },
-  { id: 3, name: "Mike Chen", email: "mike@example.com", role: "Employer", status: "Inactive" },
-  { id: 4, name: "Emily Davis", email: "emily@example.com", role: "Moderator", status: "Active" },
-  { id: 5, name: "Alex Turner", email: "alex@example.com", role: "Employer", status: "Active" },
-];
+function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
+  return (
+    <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
+      {toasts.map((t) => (
+        <div key={t.id} style={{
+          background: t.type === "error" ? "#1c0000" : t.type === "loading" ? "#111" : "#001c05",
+          color: "#fff", padding: "11px 16px", borderRadius: 10, fontSize: 13, fontWeight: 500,
+          display: "flex", alignItems: "center", gap: 9,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.3)", minWidth: 260, maxWidth: 360,
+          border: `1px solid ${t.type === "error" ? "#ff222215" : t.type === "loading" ? "#33333360" : "#00dd3315"}`,
+          animation: "tin 0.2s ease",
+        }}>
+          <span style={{ fontSize: 14, flexShrink: 0 }}>
+            {t.type === "success" ? "✓" : t.type === "error" ? "✕" : "⟳"}
+          </span>
+          {t.message}
+        </div>
+      ))}
+    </div>
+  );
+}
 
-type ViewType = "jobseekers" | "users";
+function useToast() {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const show = (message: string, type: ToastType = "success", duration = 3500) => {
+    const id = ++_tid;
+    setToasts((p) => [...p, { id, type, message }]);
+    if (type !== "loading") {
+      setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), duration);
+    }
+    return id;
+  };
+  const dismiss = (id: number) => setToasts((p) => p.filter((t) => t.id !== id));
+  return { toasts, show, dismiss };
+}
 
-export default function AdminDashboard() {
-  const [activeView, setActiveView] = useState<ViewType>("jobseekers");
+export default function AdminAuth() {
+  const router = useRouter();
+  const { toasts, show, dismiss } = useToast();
+
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.replace("/admin-dashboard");
+    });
+  }, []);
+
+  const switchMode = (m: "signin" | "signup") => {
+    setMode(m);
+    setName("");
+    setEmail("");
+    setPassword("");
+  };
+
+  const validate = () => {
+    if (mode === "signup" && !name.trim()) { show("Please enter your name.", "error"); return false; }
+    if (!email.trim()) { show("Please enter your email.", "error"); return false; }
+    if (!password) { show("Please enter your password.", "error"); return false; }
+    if (password.length < 6) { show("Password must be at least 6 characters.", "error"); return false; }
+    return true;
+  };
+
+  const handleSignUp = async () => {
+    const lid = show("Creating your account...", "loading");
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { name: name.trim() },
+        },
+      });
+      if (error) throw error;
+
+      if (data.user) {
+        const { error: insertErr } = await supabase.from("admins").insert({
+          auth_id: data.user.id,
+          name: name.trim(),
+          email: email.trim(),
+          role: "admin",
+        });
+        if (insertErr) console.error("Admins insert:", insertErr.message);
+      }
+
+      dismiss(lid);
+      show("Account created! Signing you in...", "success");
+
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (signInErr) {
+        show("Check your email to confirm your account, then sign in.", "success", 6000);
+        switchMode("signin");
+      } else {
+        show("Welcome! Redirecting to dashboard...", "success");
+        setTimeout(() => router.push("/admin-dashboard"), 1000);
+      }
+    } catch (err: any) {
+      dismiss(lid);
+      show(err.message ?? "Sign up failed. Try again.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignIn = async () => {
+    const lid = show("Signing in...", "loading");
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) throw error;
+
+      dismiss(lid);
+      show("Signed in! Redirecting...", "success");
+      setTimeout(() => router.push("/admin-dashboard"), 1000);
+    } catch (err: any) {
+      dismiss(lid);
+      show(err.message ?? "Sign in failed. Check your credentials.", "error");
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setLoading(true);
+    if (mode === "signup") {
+      await handleSignUp();
+    } else {
+      await handleSignIn();
+    }
+  };
 
   return (
-    <div className="flex min-h-screen bg-white dark:bg-black">
-      {/* Minimal Sidebar - Compact */}
-      <aside className="fixed left-0 top-0 h-full w-48 border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-black">
-        <div className="flex h-full flex-col">
-          {/* Logo - Compact */}
-          <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
-            <Image
-              className="dark:invert"
-              src="/next.svg"
-              alt="Logo"
-              width={80}
-              height={16}
-              priority
-            />
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: #F5F5F5; }
+        @keyframes tin { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+        .page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: #F5F5F5; }
+        .card { background: #fff; border: 1px solid #E8E8E8; border-radius: 14px; width: 100%; max-width: 380px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+        .card-top { background: #111; padding: 28px 28px 24px; }
+        .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+        .brand-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+        .brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: -0.2px; }
+        .card-title { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -0.4px; margin-bottom: 4px; }
+        .card-sub { font-size: 12.5px; color: #666; }
+        .card-body { padding: 24px 28px 28px; }
+        .toggle { display: flex; background: #F5F5F5; border-radius: 8px; padding: 3px; margin-bottom: 22px; }
+        .toggle-btn { flex: 1; padding: 7px; border: none; border-radius: 6px; font-size: 12.5px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.12s; color: #999; background: transparent; }
+        .toggle-btn.on { background: #fff; color: #111; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .toggle-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+        .field { margin-bottom: 14px; }
+        .field-label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: #999; margin-bottom: 6px; }
+        .field-input { width: 100%; border: 1.5px solid #EBEBEB; border-radius: 8px; padding: 10px 13px; font-size: 13.5px; font-family: 'Inter', sans-serif; color: #111; background: #FAFAFA; outline: none; transition: border-color 0.15s, background 0.15s; }
+        .field-input::placeholder { color: #ccc; }
+        .field-input:focus { border-color: #111; background: #fff; }
+        .field-input:disabled { opacity: 0.45; cursor: not-allowed; }
+        .divider { border: none; border-top: 1px solid #F0F0F0; margin: 18px 0; }
+        .submit-btn { width: 100%; background: #111; color: #fff; border: none; border-radius: 8px; padding: 11px; font-size: 13.5px; font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .submit-btn:hover:not(:disabled) { opacity: 0.82; }
+        .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-spin { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.65s linear infinite; flex-shrink: 0; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .footer-note { text-align: center; margin-top: 18px; font-size: 11.5px; color: #bbb; }
+        .footer-link { color: #111; font-weight: 600; cursor: pointer; background: none; border: none; font-size: 11.5px; font-family: 'Inter', sans-serif; padding: 0; }
+        .footer-link:hover { text-decoration: underline; }
+        .footer-link:disabled { opacity: 0.5; cursor: not-allowed; }
+        .secure-note { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px; color: #ddd; margin-top: 14px; }
+      `}</style>
+
+      <ToastContainer toasts={toasts} />
+
+      <div className="page">
+        <div className="card">
+          <div className="card-top">
+            {/* <div className="brand">
+              <div className="brand-dot" />
+              <span className="brand-name">WorkAdmin</span>
+            </div> */}
+            <div className="card-title">
+              {mode === "signin" ? "Sign In" : "Create account"}
+            </div>
+            {/* <div className="card-sub">
+              {mode === "signin"
+                ? "Sign in to access your admin panel"
+                : "Set up your admin account"}
+            </div> */}
           </div>
 
-          {/* Single Navigation Item - Compact */}
-          <nav className="flex-1 p-2">
-            <div className="flex w-full items-center gap-2 rounded px-3 py-2 text-xs font-medium text-black dark:text-white bg-gray-100 dark:bg-gray-900">
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
+          <div className="card-body">
+            <div className="toggle">
+              <button
+                type="button"
+                className={`toggle-btn ${mode === "signin" ? "on" : ""}`}
+                onClick={() => switchMode("signin")}
+                disabled={loading}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                />
-              </svg>
-              Users
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn ${mode === "signup" ? "on" : ""}`}
+                onClick={() => switchMode("signup")}
+                disabled={loading}
+              >
+                Sign Up
+              </button>
             </div>
-          </nav>
 
-          {/* Logout at Bottom - Compact */}
-          <div className="border-t border-gray-200 p-2 dark:border-gray-800">
-            <button className="flex w-full items-center gap-2 rounded px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-900">
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+            <form onSubmit={handleSubmit}>
+
+              {/* Name — Sign Up only */}
+              {mode === "signup" && (
+                <div className="field">
+                  <label className="field-label">Full Name</label>
+                  <input
+                    className="field-input"
+                    type="text"
+                    placeholder="John Doe"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    autoComplete="name"
+                    disabled={loading}
+                  />
+                </div>
+              )}
+
+              {/* Email — both modes */}
+              <div className="field">
+                <label className="field-label">Email Address</label>
+                <input
+                  className="field-input"
+                  type="email"
+                  placeholder="admin@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  disabled={loading}
                 />
-              </svg>
-              Logout
-            </button>
+              </div>
+
+              {/* Password — both modes */}
+              <div className="field">
+                <label className="field-label">Password</label>
+                <input
+                  className="field-input"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                  disabled={loading}
+                />
+              </div>
+
+              <hr className="divider" />
+
+              <button className="submit-btn" type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <div className="btn-spin" />
+                    {mode === "signin" ? "Signing in..." : "Creating account..."}
+                  </>
+                ) : mode === "signin" ? (
+                  "Sign In →"
+                ) : (
+                  "Create Account →"
+                )}
+              </button>
+            </form>
+
+            <div className="footer-note">
+              {mode === "signin" ? (
+                <>
+                  Don&apos;t have an account?{" "}
+                  <button className="footer-link" onClick={() => switchMode("signup")} disabled={loading}>
+                    Sign up
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{" "}
+                  <button className="footer-link" onClick={() => switchMode("signin")} disabled={loading}>
+                    Sign in
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* <div className="secure-note">🔒 Secured by Supabase Auth</div> */}
           </div>
         </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="ml-48 flex-1">
-        {/* Simple Header - Compact */}
-        <header className="border-b border-gray-200 bg-white px-6 py-2 dark:border-gray-800 dark:bg-black">
-          <div className="flex items-center justify-between">
-            <h1 className="text-sm font-medium text-black dark:text-white">
-              Dashboard
-            </h1>
-            <div className="h-6 w-6 rounded-full bg-gray-200 dark:bg-gray-800"></div>
-          </div>
-        </header>
-
-        {/* Content Area - Compact Padding */}
-        <div className="p-4">
-          {/* Top Tabs - Compact */}
-          <div className="mb-4 flex gap-0.5 rounded bg-gray-100 p-0.5 dark:bg-gray-900">
-            <button
-              onClick={() => setActiveView("jobseekers")}
-              className={`flex-1 rounded px-3 py-1.5 text-xs font-medium transition-all ${
-                activeView === "jobseekers"
-                  ? "bg-white text-black dark:bg-black dark:text-white"
-                  : "text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"
-              }`}
-            >
-              Jobseekers
-            </button>
-            <button
-              onClick={() => setActiveView("users")}
-              className={`flex-1 rounded px-3 py-1.5 text-xs font-medium transition-all ${
-                activeView === "users"
-                  ? "bg-white text-black dark:bg-black dark:text-white"
-                  : "text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"
-              }`}
-            >
-              Users
-            </button>
-          </div>
-
-          {/* Stats - Minimal Cards - Compact */}
-          <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <div className="bg-white p-3 dark:bg-black">
-              <p className="text-xs text-gray-600 dark:text-gray-400">
-                {activeView === "jobseekers" ? "Total Jobseekers" : "Total Users"}
-              </p>
-              <p className="mt-1 text-xl font-light text-black dark:text-white">
-                {activeView === "jobseekers" ? "156" : "89"}
-              </p>
-            </div>
-            <div className="bg-white p-3 dark:bg-black">
-              <p className="text-xs text-gray-600 dark:text-gray-400">Active</p>
-              <p className="mt-1 text-xl font-light text-black dark:text-white">
-                {activeView === "jobseekers" ? "142" : "76"}
-              </p>
-            </div>
-            <div className="bg-white p-3 dark:bg-black">
-              <p className="text-xs text-gray-600 dark:text-gray-400">Inactive</p>
-              <p className="mt-1 text-xl font-light text-black dark:text-white">
-                {activeView === "jobseekers" ? "14" : "13"}
-              </p>
-            </div>
-          </div>
-
-          {/* Simple Search - Compact */}
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder={`Search ${activeView}...`}
-              className="w-full bg-white px-3 py-1.5 text-xs text-black placeholder-gray-400 focus:outline-none dark:bg-black dark:text-white"
-            />
-          </div>
-
-          {/* Minimal Tables - Compact */}
-          <div className="bg-white dark:bg-black">
-            {activeView === "jobseekers" ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-800">
-                      <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">Name</th>
-                      <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">Email</th>
-                      <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">Jobs</th>
-                      <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">Status</th>
-                      <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {mockJobseekers.map((jobseeker) => (
-                      <tr key={jobseeker.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
-                        <td className="px-3 py-2 text-xs text-black dark:text-white">{jobseeker.name}</td>
-                        <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{jobseeker.email}</td>
-                        <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{jobseeker.appliedJobs}</td>
-                        <td className="px-3 py-2 text-xs">
-                          <span className={`${
-                            jobseeker.status === "Active" 
-                              ? "text-black dark:text-white"
-                              : "text-gray-400 dark:text-gray-600"
-                          }`}>
-                            {jobseeker.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-xs">
-                          <button className="text-black underline hover:no-underline dark:text-white">
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-800">
-                      <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">Name</th>
-                      <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">Email</th>
-                      <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">Role</th>
-                      <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">Status</th>
-                      <th className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {mockUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
-                        <td className="px-3 py-2 text-xs text-black dark:text-white">{user.name}</td>
-                        <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{user.email}</td>
-                        <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{user.role}</td>
-                        <td className="px-3 py-2 text-xs">
-                          <span className={`${
-                            user.status === "Active" 
-                              ? "text-black dark:text-white"
-                              : "text-gray-400 dark:text-gray-600"
-                          }`}>
-                            {user.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-xs">
-                          <button className="text-black underline hover:no-underline dark:text-white">
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
-    </div>
+      </div>
+    </>
   );
 }

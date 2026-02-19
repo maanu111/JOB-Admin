@@ -1,0 +1,544 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { Avatar } from "./Avatar";
+import { Profile, JobSeeker } from "./types";
+import { formatDate, formatCurrency } from "./utils";
+
+interface UserTabProps {
+  profiles: Profile[];
+  jobSeekers: JobSeeker[];
+  totalUsers: number;
+  totalSeekers: number;
+  onViewUser: (user: Profile) => void;
+  onViewSeeker: (seeker: JobSeeker) => void;
+  onViewDoc: (url: string, title: string) => void;
+}
+
+type SubTab = "users" | "jobseekers";
+
+// Filter Types
+interface UserFilters {
+  userType: string;
+  dateRange: string;
+}
+
+interface JobSeekerFilters {
+  jobType: string;
+  minCharges: number | null;
+  maxCharges: number | null;
+  hasDocuments: string;
+  dateRange: string;
+}
+
+export const UserTab = ({
+  profiles,
+  jobSeekers,
+  totalUsers,
+  totalSeekers,
+  onViewUser,
+  onViewSeeker,
+  onViewDoc
+}: UserTabProps) => {
+  const [subTab, setSubTab] = useState<SubTab>("users");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // User Filters State
+  const [userFilters, setUserFilters] = useState<UserFilters>({
+    userType: "all",
+    dateRange: "all"
+  });
+
+  // Job Seeker Filters State
+  const [seekerFilters, setSeekerFilters] = useState<JobSeekerFilters>({
+    jobType: "all",
+    minCharges: null,
+    maxCharges: null,
+    hasDocuments: "all",
+    dateRange: "all"
+  });
+
+  // Get unique job types from job seekers
+  const jobTypes = useMemo(() => {
+    const types = new Set<string>();
+    jobSeekers.forEach(seeker => {
+      if (seeker.job_type) types.add(seeker.job_type);
+    });
+    return Array.from(types).sort();
+  }, [jobSeekers]);
+
+  // Filter Users
+  const filteredUsers = useMemo(() => {
+    let filtered = profiles.filter(p => p.user_type === "user");
+
+    // Search filter
+    const q = searchQuery.toLowerCase();
+    if (q) {
+      filtered = filtered.filter(p => 
+        p.name?.toLowerCase().includes(q) || 
+        p.email?.toLowerCase().includes(q)
+      );
+    }
+
+    // User type filter
+    if (userFilters.userType !== "all") {
+      filtered = filtered.filter(p => p.user_type === userFilters.userType);
+    }
+
+    // Date range filter
+    if (userFilters.dateRange !== "all") {
+      const now = new Date();
+      const filterDate = new Date();
+      
+      switch (userFilters.dateRange) {
+        case "today":
+          filterDate.setHours(0, 0, 0, 0);
+          filtered = filtered.filter(p => p.created_at && new Date(p.created_at) >= filterDate);
+          break;
+        case "week":
+          filterDate.setDate(now.getDate() - 7);
+          filtered = filtered.filter(p => p.created_at && new Date(p.created_at) >= filterDate);
+          break;
+        case "month":
+          filterDate.setMonth(now.getMonth() - 1);
+          filtered = filtered.filter(p => p.created_at && new Date(p.created_at) >= filterDate);
+          break;
+      }
+    }
+
+    return filtered;
+  }, [profiles, searchQuery, userFilters]);
+
+  // Filter Job Seekers
+  const filteredSeekers = useMemo(() => {
+    let filtered = [...jobSeekers];
+
+    // Search filter
+    const q = searchQuery.toLowerCase();
+    if (q) {
+      filtered = filtered.filter(s => 
+        s.profiles?.name?.toLowerCase().includes(q) || 
+        s.profiles?.email?.toLowerCase().includes(q) ||
+        s.job_type?.toLowerCase().includes(q) ||
+        s.mobile?.toLowerCase().includes(q)
+      );
+    }
+
+    // Job type filter
+    if (seekerFilters.jobType !== "all") {
+      filtered = filtered.filter(s => s.job_type === seekerFilters.jobType);
+    }
+
+    // Charges range filter
+    if (seekerFilters.minCharges !== null) {
+      filtered = filtered.filter(s => (s.monthly_charges || 0) >= seekerFilters.minCharges!);
+    }
+    if (seekerFilters.maxCharges !== null) {
+      filtered = filtered.filter(s => (s.monthly_charges || 0) <= seekerFilters.maxCharges!);
+    }
+
+    // Documents filter
+    if (seekerFilters.hasDocuments === "both") {
+      filtered = filtered.filter(s => s.aadhar_url && s.pan_url);
+    } else if (seekerFilters.hasDocuments === "aadhar") {
+      filtered = filtered.filter(s => s.aadhar_url);
+    } else if (seekerFilters.hasDocuments === "pan") {
+      filtered = filtered.filter(s => s.pan_url);
+    } else if (seekerFilters.hasDocuments === "none") {
+      filtered = filtered.filter(s => !s.aadhar_url && !s.pan_url);
+    }
+
+    // Date range filter
+    if (seekerFilters.dateRange !== "all") {
+      const now = new Date();
+      const filterDate = new Date();
+      
+      switch (seekerFilters.dateRange) {
+        case "today":
+          filterDate.setHours(0, 0, 0, 0);
+          filtered = filtered.filter(s => s.created_at && new Date(s.created_at) >= filterDate);
+          break;
+        case "week":
+          filterDate.setDate(now.getDate() - 7);
+          filtered = filtered.filter(s => s.created_at && new Date(s.created_at) >= filterDate);
+          break;
+        case "month":
+          filterDate.setMonth(now.getMonth() - 1);
+          filtered = filtered.filter(s => s.created_at && new Date(s.created_at) >= filterDate);
+          break;
+      }
+    }
+
+    return filtered;
+  }, [jobSeekers, searchQuery, seekerFilters]);
+
+  // Reset filters for current tab
+  const resetFilters = () => {
+    if (subTab === "users") {
+      setUserFilters({
+        userType: "all",
+        dateRange: "all"
+      });
+    } else {
+      setSeekerFilters({
+        jobType: "all",
+        minCharges: null,
+        maxCharges: null,
+        hasDocuments: "all",
+        dateRange: "all"
+      });
+    }
+    setSearchQuery("");
+  };
+
+  return (
+    <div>
+      {/* Sub Tabs */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div className="tabs">
+          <button className={`tb ${subTab === "users" ? "on" : ""}`} onClick={() => setSubTab("users")}>
+            Users <span className="tc">{filteredUsers.length}</span>
+          </button>
+          <button className={`tb ${subTab === "jobseekers" ? "on" : ""}`} onClick={() => setSubTab("jobseekers")}>
+            Job Seekers <span className="tc">{filteredSeekers.length}</span>
+          </button>
+        </div>
+
+        {/* Search Bar - Moved to right side */}
+        <div className="srch">
+          <span className="srch-ico">🔍</span>
+          <input 
+            className="srch-inp" 
+            placeholder={`Search ${subTab}...`} 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)} 
+            style={{ width: 280 }}
+          />
+        </div>
+      </div>
+
+      {/* Filter Toggle Button - Below Tabs */}
+      <div style={{ marginBottom: 12 }}>
+        <button 
+          className={`filter-toggle-btn ${showFilters ? 'active' : ''}`}
+          onClick={() => setShowFilters(!showFilters)}
+          style={{
+            padding: '6px 12px',
+            border: `1px solid ${showFilters ? '#111' : '#EBEBEB'}`,
+            background: showFilters ? '#111' : '#fff',
+            color: showFilters ? '#fff' : '#555',
+            borderRadius: '7px',
+            fontSize: '12px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+        >
+          <span>🔍</span> Filters {showFilters ? '▲' : '▼'}
+        </button>
+        
+        {(userFilters.userType !== "all" || userFilters.dateRange !== "all" || 
+          seekerFilters.jobType !== "all" || seekerFilters.hasDocuments !== "all" || 
+          seekerFilters.minCharges || seekerFilters.maxCharges) && (
+          <button 
+            onClick={resetFilters}
+            style={{
+              padding: '6px 12px',
+              border: '1px solid #FF5252',
+              background: '#fff',
+              color: '#FF5252',
+              borderRadius: '7px',
+              fontSize: '12px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              marginLeft: '8px'
+            }}
+          >
+            ✕ Reset Filters
+          </button>
+        )}
+      </div>
+
+      {/* Filters Panel - Below Tabs */}
+      {showFilters && (
+        <div style={{
+          background: '#fff',
+          border: '1px solid #EBEBEB',
+          borderRadius: '10px',
+          padding: '16px',
+          marginBottom: '20px'
+        }}>
+          {subTab === "users" ? (
+            // Users Filters
+            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+              <div style={{ minWidth: '200px' }}>
+                <label style={{ fontSize: '11px', color: '#999', display: 'block', marginBottom: '4px' }}>User Type</label>
+                <select 
+                  value={userFilters.userType}
+                  onChange={(e) => setUserFilters({...userFilters, userType: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #EBEBEB',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: '#111'
+                  }}
+                >
+                  <option value="all">All Types</option>
+                  <option value="user">Regular User</option>
+                  <option value="jobseeker">Job Seeker</option>
+                </select>
+              </div>
+
+              <div style={{ minWidth: '200px' }}>
+                <label style={{ fontSize: '11px', color: '#999', display: 'block', marginBottom: '4px' }}>Registration Date</label>
+                <select 
+                  value={userFilters.dateRange}
+                  onChange={(e) => setUserFilters({...userFilters, dateRange: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #EBEBEB',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: '#111'
+                  }}
+                >
+                  <option value="all">All Time</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">Last 30 Days</option>
+                </select>
+              </div>
+            </div>
+          ) : (
+            // Job Seekers Filters
+            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+              <div style={{ minWidth: '200px' }}>
+                <label style={{ fontSize: '11px', color: '#999', display: 'block', marginBottom: '4px' }}>Job Type</label>
+                <select 
+                  value={seekerFilters.jobType}
+                  onChange={(e) => setSeekerFilters({...seekerFilters, jobType: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #EBEBEB',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: '#111'
+                  }}
+                >
+                  <option value="all">All Types</option>
+                  {jobTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ minWidth: '200px' }}>
+                <label style={{ fontSize: '11px', color: '#999', display: 'block', marginBottom: '4px' }}>Monthly Charges (₹)</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input 
+                    type="number"
+                    placeholder="Min"
+                    value={seekerFilters.minCharges || ''}
+                    onChange={(e) => setSeekerFilters({
+                      ...seekerFilters, 
+                      minCharges: e.target.value ? Number(e.target.value) : null
+                    })}
+                    style={{
+                      width: '50%',
+                      padding: '8px',
+                      border: '1px solid #EBEBEB',
+                      borderRadius: '6px',
+                      fontSize: '12px'
+                    }}
+                  />
+                  <input 
+                    type="number"
+                    placeholder="Max"
+                    value={seekerFilters.maxCharges || ''}
+                    onChange={(e) => setSeekerFilters({
+                      ...seekerFilters, 
+                      maxCharges: e.target.value ? Number(e.target.value) : null
+                    })}
+                    style={{
+                      width: '50%',
+                      padding: '8px',
+                      border: '1px solid #EBEBEB',
+                      borderRadius: '6px',
+                      fontSize: '12px'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ minWidth: '200px' }}>
+                <label style={{ fontSize: '11px', color: '#999', display: 'block', marginBottom: '4px' }}>Documents Status</label>
+                <select 
+                  value={seekerFilters.hasDocuments}
+                  onChange={(e) => setSeekerFilters({...seekerFilters, hasDocuments: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #EBEBEB',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: '#111'
+                  }}
+                >
+                  <option value="all">All</option>
+                  <option value="both">Both Aadhar & PAN</option>
+                  <option value="aadhar">Has Aadhar Only</option>
+                  <option value="pan">Has PAN Only</option>
+                  <option value="none">No Documents</option>
+                </select>
+              </div>
+
+              <div style={{ minWidth: '200px' }}>
+                <label style={{ fontSize: '11px', color: '#999', display: 'block', marginBottom: '4px' }}>Registration Date</label>
+                <select 
+                  value={seekerFilters.dateRange}
+                  onChange={(e) => setSeekerFilters({...seekerFilters, dateRange: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #EBEBEB',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: '#111'
+                  }}
+                >
+                  <option value="all">All Time</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">Last 30 Days</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Users Table */}
+      {subTab === "users" && (
+        <div className="tbl-wrap">
+          <div className="tbl-head">
+            <span className="tbl-head-ttl">Registered Users</span>
+            <span className="tbl-head-meta">{filteredUsers.length} records</span>
+          </div>
+          
+          {filteredUsers.length === 0 ? (
+            <div className="empty-state">
+              <span style={{ fontSize: 30 }}>👤</span>
+              <span className="empty-text">No users found</span>
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Email</th>
+                  <th>Type</th>
+                  <th>User ID</th>
+                  <th>Joined</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((u) => (
+                  <tr key={u.id}>
+                    <td>
+                      <div className="nm">
+                        <Avatar name={u.name} src={null} />
+                        <span className="nm-main">{u.name ?? <span style={{ color: "#ccc" }}>—</span>}</span>
+                      </div>
+                    </td>
+                    <td className="t-sub">{u.email ?? "—"}</td>
+                    <td><span className="badge">{u.user_type ?? "—"}</span></td>
+                    <td className="t-mono">{u.id.slice(0, 14)}…</td>
+                    <td className="t-sub">{formatDate(u.created_at)}</td>
+                    <td>
+                      <button className="view-btn" onClick={() => onViewUser(u)}>
+                        View Detail
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Job Seekers Table */}
+      {subTab === "jobseekers" && (
+        <div className="tbl-wrap">
+          <div className="tbl-head">
+            <span className="tbl-head-ttl">Job Seeker Profiles</span>
+            <span className="tbl-head-meta">{filteredSeekers.length} records</span>
+          </div>
+          
+          {filteredSeekers.length === 0 ? (
+            <div className="empty-state">
+              <span style={{ fontSize: 30 }}>💼</span>
+              <span className="empty-text">No job seekers found</span>
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Seeker</th>
+                  <th>Mobile</th>
+                  <th>Job Type</th>
+                  <th>Charges / mo</th>
+                  <th>Documents</th>
+                  <th>Joined</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSeekers.map((s) => (
+                  <tr key={s.id}>
+                    <td>
+                      <div className="nm">
+                        <Avatar name={s.profiles?.name ?? null} src={s.photo_url} />
+                        <div>
+                          <div className="nm-main">{s.profiles?.name ?? <span style={{ color: "#ccc" }}>Unknown</span>}</div>
+                          <div className="nm-sub">{s.profiles?.email ?? "—"}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="t-sub">{s.mobile ?? "—"}</td>
+                    <td>{s.job_type ? <span className="badge blk">{s.job_type}</span> : <span className="t-sub">—</span>}</td>
+                    <td className="t-bold">{formatCurrency(s.monthly_charges)}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {s.aadhar_url ? (
+                          <button className="doc-pill" onClick={() => onViewDoc(s.aadhar_url!, "Aadhar Card")}>🪪 A</button>
+                        ) : <span className="doc-none">✕</span>}
+                        {s.pan_url ? (
+                          <button className="doc-pill" onClick={() => onViewDoc(s.pan_url!, "PAN Card")}>📄 P</button>
+                        ) : <span className="doc-none">✕</span>}
+                      </div>
+                    </td>
+                    <td className="t-sub">{formatDate(s.created_at)}</td>
+                    <td>
+                      <button className="view-btn" onClick={() => onViewSeeker(s)}>
+                        View Detail
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
