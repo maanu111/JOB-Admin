@@ -10,20 +10,39 @@ let _tid = 0;
 
 function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
   return (
-    <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
+    <div style={{ 
+      position: "fixed", 
+      top: 20, 
+      right: 20, 
+      left: 20,
+      zIndex: 9999, 
+      display: "flex", 
+      flexDirection: "column", 
+      alignItems: "flex-end",
+      gap: 8, 
+      pointerEvents: "none" 
+    }}>
       {toasts.map((t) => (
         <div key={t.id} style={{
           background: t.type === "error" ? "#1c0000" : t.type === "loading" ? "#111" : "#001c05",
-          color: "#fff", padding: "11px 16px", borderRadius: 10, fontSize: 13, fontWeight: 500,
-          display: "flex", alignItems: "center", gap: 9,
-          boxShadow: "0 4px 20px rgba(0,0,0,0.3)", minWidth: 260, maxWidth: 360,
+          color: "#fff", 
+          padding: "11px 16px", 
+          borderRadius: 10, 
+          fontSize: 13, 
+          fontWeight: 500,
+          display: "flex", 
+          alignItems: "center", 
+          gap: 9,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.3)", 
+          minWidth: 260, 
+          maxWidth: "calc(100vw - 40px)",
           border: `1px solid ${t.type === "error" ? "#ff222215" : t.type === "loading" ? "#33333360" : "#00dd3315"}`,
           animation: "tin 0.2s ease",
         }}>
           <span style={{ fontSize: 14, flexShrink: 0 }}>
             {t.type === "success" ? "✓" : t.type === "error" ? "✕" : "⟳"}
           </span>
-          {t.message}
+          <span style={{ wordBreak: "break-word" }}>{t.message}</span>
         </div>
       ))}
     </div>
@@ -157,15 +176,21 @@ export default function AdminAuth() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', sans-serif; background: #F5F5F5; }
         @keyframes tin { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
-        .page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: #F5F5F5; }
+        .page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: #F5F5F5; }
         .card { background: #fff; border: 1px solid #E8E8E8; border-radius: 14px; width: 100%; max-width: 380px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
-        .card-top { background: #111; padding: 28px 28px 24px; }
+        .card-top { background: #111; padding: 24px 20px; }
+        @media (min-width: 480px) {
+          .card-top { padding: 28px; }
+        }
         .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
         .brand-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; }
         .brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: -0.2px; }
         .card-title { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -0.4px; margin-bottom: 4px; }
         .card-sub { font-size: 12.5px; color: #666; }
-        .card-body { padding: 24px 28px 28px; }
+        .card-body { padding: 20px; }
+        @media (min-width: 480px) {
+          .card-body { padding: 24px 28px 28px; }
+        }
         .toggle { display: flex; background: #F5F5F5; border-radius: 8px; padding: 3px; margin-bottom: 22px; }
         .toggle-btn { flex: 1; padding: 7px; border: none; border-radius: 6px; font-size: 12.5px; font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.12s; color: #999; background: transparent; }
         .toggle-btn.on { background: #fff; color: #111; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
@@ -194,18 +219,9 @@ export default function AdminAuth() {
       <div className="page">
         <div className="card">
           <div className="card-top">
-            {/* <div className="brand">
-              <div className="brand-dot" />
-              <span className="brand-name">WorkAdmin</span>
-            </div> */}
             <div className="card-title">
               {mode === "signin" ? "Sign In" : "Create account"}
             </div>
-            {/* <div className="card-sub">
-              {mode === "signin"
-                ? "Sign in to access your admin panel"
-                : "Set up your admin account"}
-            </div> */}
           </div>
 
           <div className="card-body">
@@ -230,7 +246,6 @@ export default function AdminAuth() {
 
             <form onSubmit={handleSubmit}>
 
-              {/* Name — Sign Up only */}
               {mode === "signup" && (
                 <div className="field">
                   <label className="field-label">Full Name</label>
@@ -246,7 +261,6 @@ export default function AdminAuth() {
                 </div>
               )}
 
-              {/* Email — both modes */}
               <div className="field">
                 <label className="field-label">Email Address</label>
                 <input
@@ -260,7 +274,6 @@ export default function AdminAuth() {
                 />
               </div>
 
-              {/* Password — both modes */}
               <div className="field">
                 <label className="field-label">Password</label>
                 <input
@@ -307,8 +320,6 @@ export default function AdminAuth() {
                 </>
               )}
             </div>
-
-            {/* <div className="secure-note">🔒 Secured by Supabase Auth</div> */}
           </div>
         </div>
       </div>

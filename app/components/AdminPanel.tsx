@@ -86,141 +86,45 @@ export const AdminPanel = ({
     }
   };
 
-  // Separate users by status
   const pendingUsers = profiles.filter(p => p.status === 'pending');
   const approvedUsers = profiles.filter(p => p.status === 'approved');
   const rejectedUsers = profiles.filter(p => p.status === 'rejected');
 
-  // Sort signup logs by date (newest first)
   const sortedSignupLogs = [...signupLogs].sort((a, b) => 
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
   return (
     <div>
-      {/* Stats Cards - Compact Row */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '8px',
-        marginBottom: '20px',
-        flexWrap: 'wrap'
-      }}>
-        <div style={{ 
-          background: '#fff', 
-          borderRadius: '10px', 
-          padding: '10px 14px',
-          border: '1px solid #F0F0F0',
-          minWidth: '100px',
-          flex: 1
-        }}>
-          <div style={{ fontSize: '11px', color: '#999', marginBottom: '2px' }}>Total Users</div>
-          <div style={{ fontSize: '20px', fontWeight: 600, color: '#111' }}>{totalUsers}</div>
+      {/* Stats Cards */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-lbl">Total Users</div>
+          <div className="stat-val">{totalUsers}</div>
         </div>
-        <div style={{ 
-          background: '#fff', 
-          borderRadius: '10px', 
-          padding: '10px 14px',
-          border: '1px solid #F0F0F0',
-          minWidth: '100px',
-          flex: 1
-        }}>
-          <div style={{ fontSize: '11px', color: '#999', marginBottom: '2px' }}>Pending</div>
-          <div style={{ fontSize: '20px', fontWeight: 600, color: '#FF9800' }}>{pendingUsers.length}</div>
+        <div className="stat-card">
+          <div className="stat-lbl">Pending</div>
+          <div className="stat-val" style={{ color: '#FF9800' }}>{pendingUsers.length}</div>
         </div>
-        <div style={{ 
-          background: '#fff', 
-          borderRadius: '10px', 
-          padding: '10px 14px',
-          border: '1px solid #F0F0F0',
-          minWidth: '100px',
-          flex: 1
-        }}>
-          <div style={{ fontSize: '11px', color: '#999', marginBottom: '2px' }}>Approved</div>
-          <div style={{ fontSize: '20px', fontWeight: 600, color: '#4CAF50' }}>{approvedUsers.length}</div>
+        <div className="stat-card">
+          <div className="stat-lbl">Approved</div>
+          <div className="stat-val" style={{ color: '#4CAF50' }}>{approvedUsers.length}</div>
         </div>
-        <div style={{ 
-          background: '#fff', 
-          borderRadius: '10px', 
-          padding: '10px 14px',
-          border: '1px solid #F0F0F0',
-          minWidth: '100px',
-          flex: 1
-        }}>
-          <div style={{ fontSize: '11px', color: '#999', marginBottom: '2px' }}>Rejected</div>
-          <div style={{ fontSize: '20px', fontWeight: 600, color: '#FF5252' }}>{rejectedUsers.length}</div>
+        <div className="stat-card">
+          <div className="stat-lbl">Rejected</div>
+          <div className="stat-val" style={{ color: '#FF5252' }}>{rejectedUsers.length}</div>
         </div>
-        <div style={{ 
-          background: '#F8F8F8', 
-          borderRadius: '10px', 
-          padding: '10px 14px',
-          minWidth: '100px',
-          flex: 1
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
-            <span style={{ fontSize: '12px' }}>📝</span>
-            <span style={{ fontSize: '11px', color: '#666' }}>Today</span>
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 600, color: '#111' }}>{todaySignups}</div>
+        <div className="stat-card">
+          <div className="stat-lbl">Today</div>
+          <div className="stat-val">{todaySignups}</div>
         </div>
-        <div style={{ 
-          background: '#F8F8F8', 
-          borderRadius: '10px', 
-          padding: '10px 14px',
-          minWidth: '100px',
-          flex: 1
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
-            <span style={{ fontSize: '12px' }}>📅</span>
-            <span style={{ fontSize: '11px', color: '#666' }}>Month</span>
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: 600, color: '#111' }}>{monthSignups}</div>
+        <div className="stat-card">
+          <div className="stat-lbl">Month</div>
+          <div className="stat-val">{monthSignups}</div>
         </div>
       </div>
 
-      {/* Current Session Card - Minimal */}
-      {/* <div style={{ 
-        background: '#fff', 
-        borderRadius: '12px', 
-        padding: '14px 18px',
-        border: '1px solid #F0F0F0',
-        marginBottom: '24px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '14px' }}>🔐</span>
-            <span style={{ fontSize: '13px', fontWeight: 600 }}>Current Session</span>
-          </div>
-          <span style={{ 
-            fontSize: '10px', 
-            color: '#4CAF50', 
-            background: '#E8F5E9', 
-            padding: '3px 8px', 
-            borderRadius: '20px',
-            fontWeight: 500
-          }}>
-            Active
-          </span>
-        </div>
-        
-        {currentUser ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Avatar name={currentUser.profile?.name || currentUser.user_metadata?.name} src={null} size={40} />
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '14px' }}>
-                {currentUser.profile?.name || currentUser.user_metadata?.name || 'Admin'}
-              </div>
-              <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>{currentUser.email}</div>
-              <div style={{ fontSize: '10px', color: '#999', marginTop: '4px' }}>
-                Last: {formatDateTime(currentUser.last_sign_in_at)}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ color: '#777', padding: '6px 0', fontSize: '12px' }}>No active session</div>
-        )}
-      </div> */}
-
-      {/* Recent Signups Section - First */}
+      {/* Recent Signups */}
       <div style={{ marginBottom: '24px' }}>
         <div style={{ 
           display: 'flex', 
@@ -257,32 +161,32 @@ export const AdminPanel = ({
                   key={log.id}
                   onClick={() => handleUserClick(log.user_id)}
                   style={{ 
-                    padding: '10px 14px',
+                    padding: '12px',
                     borderBottom: index < Math.min(sortedSignupLogs.length, 10) - 1 ? '1px solid #F5F5F5' : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
                     cursor: 'pointer',
                     transition: 'background 0.1s'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = '#FAFAFA'}
                   onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                    <Avatar name={profileData?.name || null} src={null} size={28} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 500, fontSize: '12px', marginBottom: '2px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Avatar name={profileData?.name || null} src={null} size={32} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 500, fontSize: '13px', marginBottom: '2px' }}>
                         {profileData?.name || 'Unknown'}
                       </div>
-                      <div style={{ fontSize: '10px', color: '#777' }}>{profileData?.email}</div>
+                      <div style={{ fontSize: '11px', color: '#777', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {profileData?.email}
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <span style={{ 
                         fontSize: '10px', 
                         background: '#F5F5F5', 
                         padding: '2px 8px',
                         borderRadius: '12px',
-                        color: '#666'
+                        color: '#666',
+                        whiteSpace: 'nowrap'
                       }}>
                         {profileData?.user_type || 'user'}
                       </span>
@@ -295,14 +199,15 @@ export const AdminPanel = ({
                                    userProfile?.status === 'rejected' ? '#FFEBEE' : '#F5F5F5',
                         color: userProfile?.status === 'approved' ? '#2E7D32' :
                                userProfile?.status === 'pending' ? '#EF6C00' :
-                               userProfile?.status === 'rejected' ? '#C62828' : '#999'
+                               userProfile?.status === 'rejected' ? '#C62828' : '#999',
+                        whiteSpace: 'nowrap'
                       }}>
                         {userProfile?.status || 'unknown'}
                       </span>
-                      <span style={{ fontSize: '10px', color: '#999' }}>
-                        {formatDateTime(log.created_at)}
-                      </span>
                     </div>
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#999', marginTop: '4px', textAlign: 'right' }}>
+                    {formatDateTime(log.created_at)}
                   </div>
                 </div>
               );
@@ -315,7 +220,7 @@ export const AdminPanel = ({
         </div>
       </div>
 
-      {/* Pending Approvals Section - Second */}
+      {/* Pending Approvals */}
       {pendingUsers.length > 0 && (
         <div>
           <div style={{ 
@@ -347,91 +252,93 @@ export const AdminPanel = ({
               <div 
                 key={profile.id}
                 style={{ 
-                  padding: '12px 14px',
+                  padding: '12px',
                   borderBottom: index < pendingUsers.length - 1 ? '1px solid #F5F5F5' : 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                  <Avatar name={profile.name} src={null} size={32} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 500, fontSize: '13px', marginBottom: '2px' }}>
-                      {profile.name || 'Unknown'}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#777' }}>{profile.email}</div>
-                  </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Avatar name={profile.name} src={null} size={32} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 500, fontSize: '13px', marginBottom: '2px' }}>
+                        {profile.name || 'Unknown'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#777', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {profile.email}
+                      </div>
+                    </div>
                     <span style={{ 
                       fontSize: '11px', 
                       background: '#FFF3E0', 
                       color: '#EF6C00',
                       padding: '2px 8px',
                       borderRadius: '12px',
-                      fontWeight: 500
+                      fontWeight: 500,
+                      whiteSpace: 'nowrap'
                     }}>
                       {profile.user_type || 'user'}
                     </span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                     <span style={{ fontSize: '11px', color: '#999' }}>
                       {formatDateTime(profile.created_at)}
                     </span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewUser(profile);
+                        }}
+                        style={{
+                          border: '1px solid #E5E5E5',
+                          background: '#fff',
+                          borderRadius: '5px',
+                          padding: '5px 10px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          color: '#666',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={(e) => handleApprove(profile.id, e)}
+                        disabled={processingId === profile.id}
+                        style={{
+                          border: 'none',
+                          background: processingId === profile.id ? '#E0E0E0' : '#4CAF50',
+                          borderRadius: '5px',
+                          padding: '5px 12px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          color: '#fff',
+                          cursor: processingId === profile.id ? 'not-allowed' : 'pointer',
+                          opacity: processingId === profile.id ? 0.6 : 1
+                        }}
+                      >
+                        {processingId === profile.id ? '...' : 'Approve'}
+                      </button>
+                      <button
+                        onClick={(e) => handleReject(profile.id, e)}
+                        disabled={processingId === profile.id}
+                        style={{
+                          border: '1px solid #FF5252',
+                          background: '#fff',
+                          borderRadius: '5px',
+                          padding: '5px 12px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          color: '#FF5252',
+                          cursor: processingId === profile.id ? 'not-allowed' : 'pointer',
+                          opacity: processingId === profile.id ? 0.6 : 1
+                        }}
+                      >
+                        {processingId === profile.id ? '...' : 'Reject'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '6px', marginLeft: '12px' }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onViewUser(profile);
-                    }}
-                    style={{
-                      border: '1px solid #E5E5E5',
-                      background: '#fff',
-                      borderRadius: '5px',
-                      padding: '5px 10px',
-                      fontSize: '11px',
-                      fontWeight: 500,
-                      color: '#666',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    View
-                  </button>
-                  <button
-                    onClick={(e) => handleApprove(profile.id, e)}
-                    disabled={processingId === profile.id}
-                    style={{
-                      border: 'none',
-                      background: processingId === profile.id ? '#E0E0E0' : '#4CAF50',
-                      borderRadius: '5px',
-                      padding: '5px 12px',
-                      fontSize: '11px',
-                      fontWeight: 500,
-                      color: '#fff',
-                      cursor: processingId === profile.id ? 'not-allowed' : 'pointer',
-                      opacity: processingId === profile.id ? 0.6 : 1
-                    }}
-                  >
-                    {processingId === profile.id ? '...' : 'Approve'}
-                  </button>
-                  <button
-                    onClick={(e) => handleReject(profile.id, e)}
-                    disabled={processingId === profile.id}
-                    style={{
-                      border: '1px solid #FF5252',
-                      background: '#fff',
-                      borderRadius: '5px',
-                      padding: '5px 12px',
-                      fontSize: '11px',
-                      fontWeight: 500,
-                      color: '#FF5252',
-                      cursor: processingId === profile.id ? 'not-allowed' : 'pointer',
-                      opacity: processingId === profile.id ? 0.6 : 1
-                    }}
-                  >
-                    {processingId === profile.id ? '...' : 'Reject'}
-                  </button>
                 </div>
               </div>
             ))}

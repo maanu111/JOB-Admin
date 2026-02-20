@@ -87,7 +87,6 @@ export const BannerManager = ({ showToast, dismissToast }: BannerManagerProps) =
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Upload image to storage
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `banner-${Date.now()}.${fileExt}`;
       const filePath = fileName;
@@ -98,18 +97,15 @@ export const BannerManager = ({ showToast, dismissToast }: BannerManagerProps) =
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from("banners")
         .getPublicUrl(filePath);
 
-      // Deactivate all current banners
       await supabase
         .from("banners")
         .update({ is_active: false })
         .eq("is_active", true);
 
-      // Save new banner
       const { error: dbError } = await supabase
         .from("banners")
         .insert({
@@ -122,7 +118,6 @@ export const BannerManager = ({ showToast, dismissToast }: BannerManagerProps) =
 
       if (dbError) throw dbError;
 
-      // Reset form
       setSelectedFile(null);
       setPreviewUrl(null);
       setTitle("");
@@ -153,13 +148,11 @@ export const BannerManager = ({ showToast, dismissToast }: BannerManagerProps) =
         toastId = showToast("Updating banner...", "loading");
       }
 
-      // Deactivate all banners
       await supabase
         .from("banners")
         .update({ is_active: false })
         .neq("id", bannerId);
 
-      // Activate selected banner
       const { error } = await supabase
         .from("banners")
         .update({ is_active: true })
@@ -192,17 +185,14 @@ export const BannerManager = ({ showToast, dismissToast }: BannerManagerProps) =
         toastId = showToast("Deleting banner...", "loading");
       }
 
-      // Extract file name from URL
       const fileName = imageUrl.split('/').pop();
       
       if (fileName) {
-        // Delete from storage
         await supabase.storage
           .from("banners")
           .remove([fileName]);
       }
 
-      // Delete from database
       const { error } = await supabase
         .from("banners")
         .delete()
@@ -226,16 +216,16 @@ export const BannerManager = ({ showToast, dismissToast }: BannerManagerProps) =
   };
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div style={{ padding: '0' }}>
       <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '20px' }}>🎨 Banner Management</h2>
 
       {/* Upload Form */}
       <div style={{
         background: '#fff',
         borderRadius: '12px',
-        padding: '24px',
+        padding: '16px',
         border: '1px solid #F0F0F0',
-        marginBottom: '30px'
+        marginBottom: '20px'
       }}>
         <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Upload New Banner</h3>
         
@@ -244,7 +234,12 @@ export const BannerManager = ({ showToast, dismissToast }: BannerManagerProps) =
             type="file"
             accept="image/*"
             onChange={handleFileSelect}
-            style={{ marginBottom: '12px' }}
+            style={{ 
+              width: '100%',
+              padding: '8px',
+              marginBottom: '12px',
+              fontSize: '14px'
+            }}
             disabled={uploading}
           />
           {previewUrl && (
@@ -253,8 +248,9 @@ export const BannerManager = ({ showToast, dismissToast }: BannerManagerProps) =
                 src={previewUrl} 
                 alt="Preview" 
                 style={{ 
-                  maxWidth: '100%', 
+                  width: '100%',
                   maxHeight: '200px', 
+                  objectFit: 'contain',
                   borderRadius: '8px',
                   border: '1px solid #F0F0F0'
                 }} 
@@ -296,7 +292,8 @@ export const BannerManager = ({ showToast, dismissToast }: BannerManagerProps) =
               border: '1px solid #E0E0E0',
               borderRadius: '6px',
               fontSize: '14px',
-              minHeight: '80px'
+              minHeight: '80px',
+              resize: 'vertical'
             }}
             placeholder="Enter banner description"
             disabled={uploading}
@@ -307,10 +304,11 @@ export const BannerManager = ({ showToast, dismissToast }: BannerManagerProps) =
           onClick={uploadBanner}
           disabled={!selectedFile || uploading}
           style={{
+            width: '100%',
             background: '#4CAF50',
             color: '#fff',
             border: 'none',
-            padding: '12px 24px',
+            padding: '12px',
             borderRadius: '6px',
             fontSize: '14px',
             fontWeight: 500,
@@ -349,72 +347,80 @@ export const BannerManager = ({ showToast, dismissToast }: BannerManagerProps) =
               style={{
                 padding: '16px',
                 borderBottom: '1px solid #F0F0F0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px',
                 background: banner.is_active ? '#F0F9F0' : 'transparent'
               }}
             >
-              <img
-                src={banner.image_url}
-                alt={banner.title || 'Banner'}
-                style={{
-                  width: '120px',
-                  height: '70px',
-                  objectFit: 'cover',
-                  borderRadius: '6px'
-                }}
-              />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600 }}>{banner.title || 'Untitled'}</div>
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                  {banner.description || 'No description'}
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <img
+                  src={banner.image_url}
+                  alt={banner.title || 'Banner'}
+                  style={{
+                    width: '100%',
+                    height: 'auto',
+                    maxHeight: '150px',
+                    objectFit: 'cover',
+                    borderRadius: '6px'
+                  }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>{banner.title || 'Untitled'}</div>
+                  <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+                    {banner.description || 'No description'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#999' }}>
+                    Added: {new Date(banner.created_at).toLocaleDateString()}
+                  </div>
                 </div>
-                <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
-                  Added: {new Date(banner.created_at).toLocaleDateString()}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {!banner.is_active ? (
-                  <button
-                    onClick={() => setActiveBanner(banner.id)}
-                    style={{
-                      padding: '6px 12px',
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {!banner.is_active ? (
+                    <button
+                      onClick={() => setActiveBanner(banner.id)}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        border: '1px solid #4CAF50',
+                        background: '#fff',
+                        color: '#4CAF50',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Set Active
+                    </button>
+                  ) : (
+                    <span style={{
+                      flex: 1,
+                      padding: '8px',
                       borderRadius: '4px',
                       fontSize: '12px',
-                      border: '1px solid #4CAF50',
+                      background: '#4CAF50',
+                      color: '#fff',
+                      textAlign: 'center'
+                    }}>
+                      Active ✓
+                    </span>
+                  )}
+                  <button
+                    onClick={() => deleteBanner(banner.id, banner.image_url)}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      border: '1px solid #FF5252',
                       background: '#fff',
-                      color: '#4CAF50',
+                      color: '#FF5252',
                       cursor: 'pointer'
                     }}
                   >
-                    Set Active
+                    Delete
                   </button>
-                ) : (
-                  <span style={{
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    background: '#4CAF50',
-                    color: '#fff'
-                  }}>
-                    Active ✓
-                  </span>
-                )}
-                <button
-                  onClick={() => deleteBanner(banner.id, banner.image_url)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    border: '1px solid #FF5252',
-                    background: '#fff',
-                    color: '#FF5252',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Delete
-                </button>
+                </div>
               </div>
             </div>
           ))

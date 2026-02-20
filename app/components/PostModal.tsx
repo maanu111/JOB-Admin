@@ -27,8 +27,6 @@ export const PostModal = ({ post, onClose, onDelete, showToast, dismissToast }: 
       }
       
       setIsDeleting(true);
-      
-      // Call the parent's delete function
       await onDelete(post.id);
       
       if (showToast && toastId) {
@@ -36,7 +34,6 @@ export const PostModal = ({ post, onClose, onDelete, showToast, dismissToast }: 
         showToast("Post deleted successfully", "success", 2000);
       }
       
-      // Close modal after successful delete
       onClose();
     } catch (error: any) {
       console.error("Delete error in modal:", error);
@@ -50,21 +47,73 @@ export const PostModal = ({ post, onClose, onDelete, showToast, dismissToast }: 
   };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.78)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, overflow: "hidden", maxWidth: 680, width: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 28px 70px rgba(0,0,0,0.35)" }}>
-        <div style={{ padding: "13px 18px", borderBottom: "1px solid #F0F0F0", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "#fff", zIndex: 10 }}>
+    <div onClick={onClose} style={{ 
+      position: "fixed", 
+      inset: 0, 
+      background: "rgba(0,0,0,0.78)", 
+      zIndex: 1000, 
+      display: "flex", 
+      alignItems: "center", 
+      justifyContent: "center", 
+      padding: 16 
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ 
+        background: "#fff", 
+        borderRadius: 12, 
+        overflow: "hidden", 
+        maxWidth: 680, 
+        width: "100%", 
+        maxHeight: "90vh", 
+        overflowY: "auto", 
+        boxShadow: "0 28px 70px rgba(0,0,0,0.35)" 
+      }}>
+        <div style={{ 
+          padding: "13px 16px", 
+          borderBottom: "1px solid #F0F0F0", 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "space-between", 
+          position: "sticky", 
+          top: 0, 
+          background: "#fff", 
+          zIndex: 10 
+        }}>
           <span style={{ fontSize: 13.5, fontWeight: 600, color: "#111" }}>Post Details</span>
-          <button onClick={onClose} style={{ border: "none", background: "#F5F5F5", borderRadius: 6, width: 28, height: 28, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", color: "#555" }}>✕</button>
+          <button onClick={onClose} style={{ 
+            border: "none", 
+            background: "#F5F5F5", 
+            borderRadius: 6, 
+            width: 32, 
+            height: 32, 
+            cursor: "pointer", 
+            fontSize: 14, 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            color: "#555" 
+          }}>✕</button>
         </div>
         
-        <div style={{ padding: "20px 22px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, padding: 12, background: "#F5F5F5", borderRadius: 10 }}>
-            <Avatar name={post.user_name || null} src={null} size={40} />
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#111" }}>{post.user_name}</div>
-              <div style={{ fontSize: 12, color: "#777" }}>{post.user_email}</div>
+        <div style={{ padding: "16px" }}>
+          <div style={{ 
+            display: "flex", 
+            flexDirection: 'column',
+            gap: 12, 
+            marginBottom: 20, 
+            padding: 12, 
+            background: "#F5F5F5", 
+            borderRadius: 10 
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Avatar name={post.user_name || null} src={null} size={40} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#111" }}>{post.user_name}</div>
+                <div style={{ fontSize: 12, color: "#777", overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {post.user_email}
+                </div>
+              </div>
             </div>
-            <div style={{ marginLeft: "auto" }}>
+            <div>
               <span style={{ 
                 background: post.status === 'active' ? '#4CAF50' : post.status === 'closed' ? '#FF5252' : '#FF9800', 
                 color: '#fff', 
@@ -72,7 +121,8 @@ export const PostModal = ({ post, onClose, onDelete, showToast, dismissToast }: 
                 borderRadius: 20, 
                 fontSize: 11,
                 fontWeight: 600,
-                textTransform: 'capitalize'
+                textTransform: 'capitalize',
+                display: 'inline-block'
               }}>
                 {post.status}
               </span>
@@ -81,17 +131,17 @@ export const PostModal = ({ post, onClose, onDelete, showToast, dismissToast }: 
 
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: "#111", marginBottom: 8 }}>{post.job_title}</div>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <span style={{ fontSize: 12, color: "#777", display: "flex", alignItems: "center", gap: 4 }}>📍 {post.location}</span>
               <span style={{ fontSize: 12, color: "#777", display: "flex", alignItems: "center", gap: 4 }}>💰 {post.salary}</span>
               <span style={{ fontSize: 12, color: "#777", display: "flex", alignItems: "center", gap: 4 }}>💼 {post.job_type}</span>
-              <span style={{ fontSize: 12, color: "#777", display: "flex", alignItems: "center", gap: 4 }}>📅 Last Apply: {formatDate(post.last_apply_date)}</span>
+              <span style={{ fontSize: 12, color: "#777", display: "flex", alignItems: "center", gap: 4 }}>📅 {formatDate(post.last_apply_date)}</span>
             </div>
           </div>
 
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: "#111", marginBottom: 8 }}>Description</div>
-            <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>{post.job_description}</div>
+            <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6, wordBreak: 'break-word' }}>{post.job_description}</div>
           </div>
 
           <div style={{ marginBottom: 20 }}>

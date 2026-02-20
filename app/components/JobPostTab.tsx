@@ -26,25 +26,39 @@ export const JobPostTab = ({ userPosts, onDeletePost, showToast, dismissToast }:
     post.job_type?.toLowerCase().includes(q)
   );
 
+  const activeCount = userPosts.filter(p => p.status === 'active').length;
+  const closedCount = userPosts.filter(p => p.status === 'closed').length;
+
   return (
     <div>
-      {/* Search and Stats */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div className="stats" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 0, width: '60%', gap: '8px' }}>
-          <div className="sc" style={{ padding: '10px 12px' }}>
-            <div className="sc-lbl">Total Posts</div>
-            <div className="sc-val" style={{ fontSize: 18 }}>{userPosts.length}</div>
+      {/* Header with Search */}
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        gap: '12px',
+        marginBottom: '16px' 
+      }}>
+        {/* Stats for mobile */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(3, 1fr)', 
+          gap: '8px'
+        }}>
+          <div className="stat-card" style={{ padding: '10px' }}>
+            <div className="stat-lbl">Total</div>
+            <div className="stat-val" style={{ fontSize: '18px' }}>{userPosts.length}</div>
           </div>
-          <div className="sc" style={{ padding: '10px 12px' }}>
-            <div className="sc-lbl">Active Posts</div>
-            <div className="sc-val" style={{ fontSize: 18 }}>{userPosts.filter(p => p.status === 'active').length}</div>
+          <div className="stat-card" style={{ padding: '10px' }}>
+            <div className="stat-lbl">Active</div>
+            <div className="stat-val" style={{ fontSize: '18px', color: '#4CAF50' }}>{activeCount}</div>
           </div>
-          <div className="sc" style={{ padding: '10px 12px' }}>
-            <div className="sc-lbl">Closed Posts</div>
-            <div className="sc-val" style={{ fontSize: 18 }}>{userPosts.filter(p => p.status === 'closed').length}</div>
+          <div className="stat-card" style={{ padding: '10px' }}>
+            <div className="stat-lbl">Closed</div>
+            <div className="stat-val" style={{ fontSize: '18px', color: '#FF5252' }}>{closedCount}</div>
           </div>
         </div>
-        
+
+        {/* Search */}
         <div className="srch">
           <span className="srch-ico">🔍</span>
           <input 
@@ -52,12 +66,11 @@ export const JobPostTab = ({ userPosts, onDeletePost, showToast, dismissToast }:
             placeholder="Search posts..." 
             value={searchQuery} 
             onChange={(e) => setSearchQuery(e.target.value)} 
-            style={{ width: 260 }}
           />
         </div>
       </div>
 
-      {/* Posts List - Compact View */}
+      {/* Posts List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {filteredPosts.length === 0 ? (
           <div className="empty-state" style={{ padding: '40px 20px' }}>
@@ -70,66 +83,32 @@ export const JobPostTab = ({ userPosts, onDeletePost, showToast, dismissToast }:
               key={post.id} 
               className="post-card" 
               onClick={() => setSelectedPost(post)}
-              style={{ 
-                padding: '12px 16px',
-                cursor: 'pointer',
-                transition: 'all 0.12s'
-              }}
             >
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between',
-                marginBottom: '6px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Avatar name={post.user_name || null} src={null} size={24} />
+              <div className="post-header">
+                <div className="post-user">
+                  <Avatar name={post.user_name || null} src={null} size={28} />
                   <div>
-                    <span style={{ fontSize: '13px', fontWeight: 600 }}>{post.user_name}</span>
-                    <span style={{ fontSize: '11px', color: '#999', marginLeft: '8px' }}>{post.user_email}</span>
+                    <div className="post-user-info">{post.user_name}</div>
+                    <div className="post-user-email">{post.user_email}</div>
                   </div>
                 </div>
-                <span style={{
-                  background: post.status === 'active' ? '#E8F5E9' : post.status === 'closed' ? '#FFEBEE' : '#FFF3E0',
-                  color: post.status === 'active' ? '#2E7D32' : post.status === 'closed' ? '#C62828' : '#EF6C00',
-                  padding: '3px 8px',
-                  borderRadius: '12px',
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  textTransform: 'capitalize'
-                }}>
+                <span className={`post-status status-${post.status}`}>
                   {post.status}
                 </span>
               </div>
               
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '8px'
-              }}>
-                <span style={{ fontSize: '15px', fontWeight: 700, color: '#111' }}>{post.job_title}</span>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <span style={{ fontSize: '11px', color: '#777' }}>📍 {post.location}</span>
-                  <span style={{ fontSize: '11px', color: '#777' }}>💰 {post.salary}</span>
-                  <span style={{ fontSize: '11px', color: '#777' }}>💼 {post.job_type}</span>
-                </div>
+              <div className="post-title">{post.job_title}</div>
+              
+              <div className="post-details">
+                <span className="post-detail">📍 {post.location}</span>
+                <span className="post-detail">💰 {post.salary}</span>
+                <span className="post-detail">💼 {post.job_type}</span>
               </div>
               
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                marginTop: '6px',
-                fontSize: '10px',
-                color: '#999',
-                borderTop: '1px solid #F0F0F0',
-                paddingTop: '6px'
-              }}>
+              <div className="post-footer">
                 <span>Posted: {formatDate(post.created_at)}</span>
-                <span>Last Apply: {formatDate(post.last_apply_date)}</span>
-                <span className="post-openings" style={{ fontWeight: 600, color: '#111' }}>
+                <span>Apply by: {formatDate(post.last_apply_date)}</span>
+                <span className="post-openings">
                   {post.number_of_openings} {post.number_of_openings === 1 ? 'opening' : 'openings'}
                 </span>
               </div>
