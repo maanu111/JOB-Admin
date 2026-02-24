@@ -76,6 +76,94 @@ export default function AdminDashboard() {
     init();
   }, []);
 
+
+
+
+  useEffect(() => {
+  const channel = supabase
+    .channel("dashboard-profiles")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "profiles" },
+      (payload) => {
+        if (payload.eventType === "INSERT") {
+          setProfiles((prev) => [payload.new as Profile, ...prev]);
+        }
+
+        if (payload.eventType === "UPDATE") {
+          const updated = payload.new as Profile;
+          setProfiles((prev) =>
+            prev.map((p) => (p.id === updated.id ? updated : p))
+          );
+        }
+
+        if (payload.eventType === "DELETE") {
+          const deleted = payload.old as Profile;
+          setProfiles((prev) =>
+            prev.filter((p) => p.id !== deleted.id)
+          );
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
+
+
+useEffect(() => {
+  const channel = supabase
+    .channel("dashboard-posts")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "job_posts" },
+      (payload) => {
+        if (payload.eventType === "INSERT") {
+          setUserPosts((prev) => [payload.new as UserPost, ...prev]);
+        }
+
+        if (payload.eventType === "UPDATE") {
+          const updated = payload.new as UserPost;
+          setUserPosts((prev) =>
+            prev.map((p) => (p.id === updated.id ? updated : p))
+          );
+        }
+
+        if (payload.eventType === "DELETE") {
+          const deleted = payload.old as UserPost;
+          setUserPosts((prev) =>
+            prev.filter((p) => p.id !== deleted.id)
+          );
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
+
+
+useEffect(() => {
+  const channel = supabase
+    .channel("dashboard-signups")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "signup_logs" },
+      (payload) => {
+        setSignupLogs((prev) => [payload.new as SignupLog, ...prev]);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
+
   const fetchAllData = async () => {
     setLoading(true);
     const loadId = show("Fetching dashboard data...", "loading");
@@ -270,6 +358,11 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleViewPost = (post: UserPost) => {
+    // You can implement post detail view here if needed
+    console.log('View post:', post);
+  };
+
   const handleSignOut = async () => {
     const loadId = show("Signing out...", "loading");
     await supabase.auth.signOut();
@@ -396,13 +489,49 @@ export default function AdminDashboard() {
           .content { padding: 22px 24px; }
         }
 
-        /* Responsive Stats Grid */
-        .stats-grid { 
-          display: grid; 
-          grid-template-columns: repeat(2, 1fr); 
-          gap: 8px; 
-          margin-bottom: 20px; 
-        }
+        /* Responsive Stats Grid - Compact Cards in One Row */
+.stats-grid { 
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px; 
+  margin-bottom: 20px; 
+  justify-content: flex-start;
+}
+
+.stat-card { 
+  background: #fff; 
+  border: 1px solid #EBEBEB; 
+  border-radius: 8px; 
+  padding: 8px 10px; 
+  min-width: 85px;
+  flex: 0 0 auto;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  transition: all 0.1s ease;
+}
+
+.stat-card:hover {
+  border-color: #ccc;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+}
+
+.stat-lbl { 
+  font-size: 9px; 
+  text-transform: uppercase; 
+  letter-spacing: 0.4px; 
+  color: #999; 
+  font-weight: 500; 
+  margin-bottom: 2px; 
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-val { 
+  font-size: 16px; 
+  font-weight: 700; 
+  color: #111; 
+  line-height: 1.2; 
+}
         @media (min-width: 480px) {
           .stats-grid { grid-template-columns: repeat(3, 1fr); }
         }
@@ -690,6 +819,7 @@ export default function AdminDashboard() {
                   <AdminPanel
                     profiles={profiles}
                     signupLogs={signupLogs}
+                    userPosts={userPosts}
                     currentUser={currentUser}
                     totalUsers={totalUsers}
                     totalSeekers={totalSeekers}
@@ -700,6 +830,7 @@ export default function AdminDashboard() {
                     onRefresh={handleRefresh} 
                     onViewUser={(user) => setDetailModal({ type: "users", user })}
                     onViewSeeker={(seeker) => setDetailModal({ type: "jobseekers", seeker })}
+                    onViewPost={handleViewPost}
                   />
                 )}
 

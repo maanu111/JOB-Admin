@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Avatar } from "./Avatar";
 import { Profile, JobSeeker } from "./types";
-import { formatDate, formatCurrency } from "./utils";
+import { formatDate, formatDateTime, formatCurrency } from "./utils";
+import { supabase } from "../../supabaseClient";
+import { ToastContainer, useToast } from "../components/Toast";
 
 interface UserTabProps {
   profiles: Profile[];
@@ -13,9 +15,10 @@ interface UserTabProps {
   onViewUser: (user: Profile) => void;
   onViewSeeker: (seeker: JobSeeker) => void;
   onViewDoc: (url: string, title: string) => void;
+  onRefresh?: () => void;
 }
 
-type SubTab = "users" | "jobseekers";
+type SubTab = "users" | "jobseekers" | "requests";
 
 interface UserFilters {
   userType: string;
@@ -37,12 +40,66 @@ export const UserTab = ({
   totalSeekers,
   onViewUser,
   onViewSeeker,
-  onViewDoc
+  onViewDoc,
+  onRefresh
 }: UserTabProps) => {
   const [subTab, setSubTab] = useState<SubTab>("users");
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [localProfiles, setLocalProfiles] = useState<Profile[]>(profiles);
+
+
+
+  const { show } = useToast();
+  // Update local profiles when props change
+  useEffect(() => {
+    setLocalProfiles(profiles);
+  }, [profiles]);
+
+  useEffect(() => {
+  const channel = supabase
+    .channel("profiles-changes")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "profiles",
+      },
+      (payload) => {
+        console.log("Realtime change:", payload);
+
+        if (payload.eventType === "INSERT") {
+          const newProfile = payload.new as Profile;
+
+          // Only add if jobseeker and pending
+          if (
+            newProfile.user_type === "jobseeker" &&
+            newProfile.status === "pending"
+          ) {
+            setLocalProfiles((prev) => [newProfile, ...prev]);
+          }
+        }
+
+        if (payload.eventType === "UPDATE") {
+          const updatedProfile = payload.new as Profile;
+
+          setLocalProfiles((prev) =>
+            prev.map((p) =>
+              p.id === updatedProfile.id ? updatedProfile : p
+            )
+          );
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
+
   const [userFilters, setUserFilters] = useState<UserFilters>({
     userType: "all",
     dateRange: "all"
@@ -64,8 +121,14 @@ export const UserTab = ({
     return Array.from(types).sort();
   }, [jobSeekers]);
 
+ const pendingRequests = useMemo(() => {
+  return localProfiles.filter(
+    p => p.status === "pending" && p.user_type === "jobseeker"
+  );
+}, [localProfiles]);
+
   const filteredUsers = useMemo(() => {
-    let filtered = profiles.filter(p => p.user_type === "user");
+    let filtered = localProfiles.filter(p => p.user_type === "user");
 
     const q = searchQuery.toLowerCase();
     if (q) {
@@ -100,7 +163,7 @@ export const UserTab = ({
     }
 
     return filtered;
-  }, [profiles, searchQuery, userFilters]);
+  }, [localProfiles, searchQuery, userFilters]);
 
   const filteredSeekers = useMemo(() => {
     let filtered = [...jobSeekers];
@@ -165,7 +228,7 @@ export const UserTab = ({
         userType: "all",
         dateRange: "all"
       });
-    } else {
+    } else if (subTab === "jobseekers") {
       setSeekerFilters({
         jobType: "all",
         minCharges: null,
@@ -175,6 +238,69 @@ export const UserTab = ({
       });
     }
     setSearchQuery("");
+  };
+
+  const handleApprove = async (userId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setProcessingId(userId);
+    
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ status: "approved" })
+        .eq("id", userId);
+
+      if (error) throw error;
+      
+      // Update local state immediately for real-time removal
+      // setLocalProfiles(prevProfiles => 
+      //   prevProfiles.map(profile => 
+      //     profile.id === userId 
+      //       ? { ...profile, status: "approved" }
+      //       : profile
+      //   )
+      // );
+      
+      // Show success message
+  show("User approved successfully 🎉", "success");
+      
+      // Call onRefresh if provided (optional)
+     
+    } catch (error: any) {
+    show(error.message || "Failed to approve user", "error");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = async (userId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setProcessingId(userId);
+    
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ status: "rejected" })
+        .eq("id", userId);
+
+      if (error) throw error;
+      
+      // Update local state immediately for real-time removal
+      // setLocalProfiles(prevProfiles => 
+      //   prevProfiles.map(profile => 
+      //     profile.id === userId 
+      //       ? { ...profile, status: "rejected" }
+      //       : profile
+      //   )
+      // );
+      
+   show("User rejected ❌", "error");
+      onRefresh?.();
+    } catch (error: any) {
+      alert(error.message || "Failed to reject user");
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   // User Card Component for Mobile
@@ -322,6 +448,90 @@ export const UserTab = ({
     </div>
   );
 
+  // Request Card Component for Mobile
+  const RequestCard = ({ profile }: { profile: Profile }) => (
+    <div style={{
+      background: '#fff',
+      border: '1px solid #FFF3E0',
+      borderRadius: '12px',
+      padding: '16px',
+      marginBottom: '12px'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+        <Avatar name={profile.name} src={null} size={48} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '4px' }}>
+            {profile.name || 'Unknown'}
+          </div>
+          <div style={{ fontSize: '13px', color: '#777', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {profile.email || '—'}
+          </div>
+        </div>
+        <span style={{ 
+          fontSize: '11px', 
+          background: '#FFF3E0', 
+          color: '#EF6C00',
+          padding: '3px 10px',
+          borderRadius: '12px',
+          fontWeight: 500,
+          whiteSpace: 'nowrap'
+        }}>
+          {profile.user_type || 'user'}
+        </span>
+      </div>
+
+      <div style={{ fontSize: '11px', color: '#999', marginBottom: '14px' }}>
+        Requested: {formatDateTime(profile.created_at)}
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button
+          className="view-btn"
+          onClick={() => onViewUser(profile)}
+          style={{ flex: 1 }}
+        >
+          View
+        </button>
+        <button
+          onClick={(e) => handleApprove(profile.id, e)}
+          disabled={processingId === profile.id}
+          style={{
+            flex: 1,
+            border: 'none',
+            background: processingId === profile.id ? '#E0E0E0' : '#4CAF50',
+            borderRadius: '6px',
+            padding: '8px 12px',
+            fontSize: '12px',
+            fontWeight: 500,
+            color: '#fff',
+            cursor: processingId === profile.id ? 'not-allowed' : 'pointer',
+            opacity: processingId === profile.id ? 0.6 : 1
+          }}
+        >
+          {processingId === profile.id ? '...' : 'Approve'}
+        </button>
+        <button
+          onClick={(e) => handleReject(profile.id, e)}
+          disabled={processingId === profile.id}
+          style={{
+            flex: 1,
+            border: '1px solid #FF5252',
+            background: '#fff',
+            borderRadius: '6px',
+            padding: '8px 12px',
+            fontSize: '12px',
+            fontWeight: 500,
+            color: '#FF5252',
+            cursor: processingId === profile.id ? 'not-allowed' : 'pointer',
+            opacity: processingId === profile.id ? 0.6 : 1
+          }}
+        >
+          {processingId === profile.id ? '...' : 'Reject'}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div>
       {/* Header with Tabs and Search */}
@@ -338,47 +548,37 @@ export const UserTab = ({
           <button className={`tb ${subTab === "jobseekers" ? "on" : ""}`} onClick={() => setSubTab("jobseekers")}>
             Job Seekers <span className="tc">{filteredSeekers.length}</span>
           </button>
+          <button className={`tb ${subTab === "requests" ? "on" : ""}`} onClick={() => setSubTab("requests")}>
+            Requests{" "}
+            <span className="tc" style={{
+              background: pendingRequests.length > 0 ? '#FF9800' : undefined,
+              color: pendingRequests.length > 0 ? '#fff' : undefined
+            }}>
+              {pendingRequests.length}
+            </span>
+          </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <div className="srch" style={{ flex: 1 }}>
-            <span className="srch-ico">🔍</span>
-            <input 
-              className="srch-inp" 
-              placeholder={`Search ${subTab}...`} 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)} 
-            />
-          </div>
-          
-          <button 
-            className={`filter-toggle-btn ${showFilters ? 'active' : ''}`}
-            onClick={() => setShowFilters(!showFilters)}
-            style={{
-              padding: '8px 12px',
-              border: `1px solid ${showFilters ? '#111' : '#EBEBEB'}`,
-              background: showFilters ? '#111' : '#fff',
-              color: showFilters ? '#fff' : '#555',
-              borderRadius: '7px',
-              fontSize: '12px',
-              fontWeight: 500,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Filters {showFilters ? '▲' : '▼'}
-          </button>
-          
-          {(userFilters.userType !== "all" || userFilters.dateRange !== "all" || 
-            seekerFilters.jobType !== "all" || seekerFilters.hasDocuments !== "all" || 
-            seekerFilters.minCharges || seekerFilters.maxCharges) && (
+        {subTab !== "requests" && (
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div className="srch" style={{ flex: 1 }}>
+              <span className="srch-ico">🔍</span>
+              <input 
+                className="srch-inp" 
+                placeholder={`Search ${subTab}...`} 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+              />
+            </div>
+            
             <button 
-              onClick={resetFilters}
+              className={`filter-toggle-btn ${showFilters ? 'active' : ''}`}
+              onClick={() => setShowFilters(!showFilters)}
               style={{
                 padding: '8px 12px',
-                border: '1px solid #FF5252',
-                background: '#fff',
-                color: '#FF5252',
+                border: `1px solid ${showFilters ? '#111' : '#EBEBEB'}`,
+                background: showFilters ? '#111' : '#fff',
+                color: showFilters ? '#fff' : '#555',
                 borderRadius: '7px',
                 fontSize: '12px',
                 fontWeight: 500,
@@ -386,14 +586,35 @@ export const UserTab = ({
                 whiteSpace: 'nowrap'
               }}
             >
-              Reset
+              Filters {showFilters ? '▲' : '▼'}
             </button>
-          )}
-        </div>
+            
+            {(userFilters.userType !== "all" || userFilters.dateRange !== "all" || 
+              seekerFilters.jobType !== "all" || seekerFilters.hasDocuments !== "all" || 
+              seekerFilters.minCharges || seekerFilters.maxCharges) && (
+              <button 
+                onClick={resetFilters}
+                style={{
+                  padding: '8px 12px',
+                  border: '1px solid #FF5252',
+                  background: '#fff',
+                  color: '#FF5252',
+                  borderRadius: '7px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filters Panel */}
-      {showFilters && (
+      {showFilters && subTab !== "requests" && (
         <div style={{
           background: '#fff',
           border: '1px solid #EBEBEB',
@@ -696,6 +917,125 @@ export const UserTab = ({
         </div>
       )}
 
+      {/* Requests Section */}
+      {subTab === "requests" && (
+        <div className="tbl-wrap">
+          <div className="tbl-head">
+            <span className="tbl-head-ttl">Pending Approval Requests</span>
+            <span className="tbl-head-meta">{pendingRequests.length} pending</span>
+          </div>
+
+          {pendingRequests.length === 0 ? (
+            <div className="empty-state">
+              <span style={{ fontSize: 30 }}>✅</span>
+              <span className="empty-text">No pending requests</span>
+            </div>
+          ) : (
+            <>
+              {/* Desktop Table View */}
+              <div className="desktop-only">
+                <div className="table-responsive">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>User Type</th>
+                        <th>Requested</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingRequests.map((profile) => (
+                        <tr key={profile.id}>
+                          <td>
+                            <div className="nm">
+                              <Avatar name={profile.name} src={null} />
+                              <span className="nm-main">{profile.name ?? "—"}</span>
+                            </div>
+                          </td>
+                          <td className="t-sub">{profile.email ?? "—"}</td>
+                          <td>
+                            <span style={{
+                              fontSize: '11px',
+                              background: '#FFF3E0',
+                              color: '#EF6C00',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontWeight: 500
+                            }}>
+                              {profile.user_type || 'user'}
+                            </span>
+                          </td>
+                          <td className="t-sub">{formatDateTime(profile.created_at)}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <button
+                                className="view-btn"
+                                onClick={() => onViewUser(profile)}
+                                style={{
+                                  padding: '6px 12px',
+                                  fontSize: '12px'
+                                }}
+                              >
+                                View
+                              </button>
+                              <button
+                                onClick={(e) => handleApprove(profile.id, e)}
+                                disabled={processingId === profile.id}
+                                style={{
+                                  border: 'none',
+                                  background: processingId === profile.id ? '#E0E0E0' : '#4CAF50',
+                                  borderRadius: '6px',
+                                  padding: '6px 12px',
+                                  fontSize: '12px',
+                                  fontWeight: 500,
+                                  color: '#fff',
+                                  cursor: processingId === profile.id ? 'not-allowed' : 'pointer',
+                                  opacity: processingId === profile.id ? 0.6 : 1,
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {processingId === profile.id ? '...' : 'Approve'}
+                              </button>
+                              <button
+                                onClick={(e) => handleReject(profile.id, e)}
+                                disabled={processingId === profile.id}
+                                style={{
+                                  border: '1px solid #FF5252',
+                                  background: '#fff',
+                                  borderRadius: '6px',
+                                  padding: '6px 12px',
+                                  fontSize: '12px',
+                                  fontWeight: 500,
+                                  color: '#FF5252',
+                                  cursor: processingId === profile.id ? 'not-allowed' : 'pointer',
+                                  opacity: processingId === profile.id ? 0.6 : 1,
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {processingId === profile.id ? '...' : 'Reject'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="mobile-only">
+                {pendingRequests.map(profile => (
+                  <RequestCard key={profile.id} profile={profile} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <style>{`
         /* Hide on desktop by default */
         .mobile-only {
@@ -789,6 +1129,18 @@ export const UserTab = ({
           background: #111;
           color: #fff;
           border-color: #111;
+        }
+        .empty-state {
+          padding: 40px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+        }
+        .empty-text {
+          font-size: 13px;
+          color: #999;
         }
       `}</style>
     </div>
