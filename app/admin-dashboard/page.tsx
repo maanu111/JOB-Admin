@@ -380,7 +380,7 @@ export default function AdminDashboard() {
 
       {/* Mobile Menu Toggle */}
       <div className="mobile-menu-toggle">
-        <div className="sb-brand">WorkAdmin</div>
+        <div className="sb-brand"> </div>
         <button className="menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
           {mobileMenuOpen ? '✕' : '☰'} Menu
         </button>
@@ -389,7 +389,7 @@ export default function AdminDashboard() {
       <div className="root">
         <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
           <div className="sb-top">
-            <div className="sb-brand">WorkAdmin</div>
+            <div className="sb-brand"> </div>
             <div className="sb-admin-card">
               <div className="sb-admin-avatar">
                 {firstName ? firstName[0].toUpperCase() : "A"}
